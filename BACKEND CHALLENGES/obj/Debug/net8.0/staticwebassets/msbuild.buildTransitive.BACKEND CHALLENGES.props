@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\buildMultiTargeting\BACKEND CHALLENGES.props" />
-</Project>
