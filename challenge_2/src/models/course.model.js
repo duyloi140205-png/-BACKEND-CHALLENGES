@@ -3,30 +3,32 @@ const sequelize = require('../config/database');
 
 const Course = sequelize.define('Course', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
-    autoIncrement: true,
+    allowNull: false
   },
   name: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: false
   },
   description: {
     type: DataTypes.TEXT,
-    allowNull: true,
+    allowNull: true
   },
   price: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
-    defaultValue: 0,
+    defaultValue: 0
   },
   status: {
     type: DataTypes.ENUM('active', 'inactive'),
-    defaultValue: 'active',
-  },
+    defaultValue: 'active'
+  }
 }, {
   tableName: 'courses',
   timestamps: true,
+  underscored: true
 });
 
 module.exports = Course;

@@ -1,23 +1,32 @@
 const express = require('express');
+const { param, body } = require('express-validator');
+const courseController = require('../controllers/course.controller');
+const { handleValidationResult } = require('../middlewares/validation.middleware');
 const router = express.Router();
-const { body } = require('express-validator');
-const {
-  getAllCourses,
-  getCourseById,
-  createCourse,
-  updateCourse,
-  deleteCourse
-} = require('../controllers/course.controller');
 
-const courseValidation = [
-  body('name').notEmpty().withMessage('Name is required'),
-  body('price').isFloat({ min: 0 }).withMessage('Price must be a positive number'),
-];
+router.get('/', courseController.getAll);
 
-router.get('/', getAllCourses);
-router.get('/:id', getCourseById);
-router.post('/', courseValidation, createCourse);
-router.put('/:id', courseValidation, updateCourse);
-router.delete('/:id', deleteCourse);
+router.get('/:id', [
+  param('id').isUUID().withMessage('ID phải đúng định dạng UUID'),
+  handleValidationResult
+], courseController.getById);
+
+router.post('/', [
+  body('name').notEmpty().withMessage('Tên khóa học không được để trống'),
+  body('price').isNumeric().withMessage('Giá tiền phải là số'),
+  handleValidationResult
+], courseController.create);
+
+router.put('/:id', [
+  param('id').isUUID().withMessage('ID phải đúng định dạng UUID'),
+  body('name').notEmpty().withMessage('Tên khóa học không được để trống'),
+  body('price').isNumeric().withMessage('Giá tiền phải là số'),
+  handleValidationResult
+], courseController.update);
+
+router.delete('/:id', [
+  param('id').isUUID().withMessage('ID phải đúng định dạng UUID'),
+  handleValidationResult
+], courseController.delete);
 
 module.exports = router;
