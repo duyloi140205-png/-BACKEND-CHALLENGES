@@ -1,0 +1,32 @@
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
+
+const Course = sequelize.define('Course', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  price: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0,
+  },
+  status: {
+    type: DataTypes.ENUM('active', 'inactive'),
+    defaultValue: 'active',
+  },
+}, {
+  tableName: 'courses',
+  timestamps: true,
+});
+
+module.exports = Course;
