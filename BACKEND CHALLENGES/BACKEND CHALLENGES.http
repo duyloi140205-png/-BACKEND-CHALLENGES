@@ -1,6 +1,0 @@
-@BACKEND_CHALLENGES_HostAddress = http://localhost:5021
-
-GET {{BACKEND_CHALLENGES_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

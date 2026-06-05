@@ -37,11 +37,12 @@ const register = async (req, res) => {
     // Tạo User và UserAuth
     const user = await User.create({ name, email });
     const otpCode = generateOTP();
+    const otpHash = await bcrypt.hash(otpCode, 10);
     const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
     await UserAuth.create({
       user_id: user.id,
       password_hash: passwordHash,
-      otp_code: otpCode,
+      otp_code: otpHash,
       otp_expiry: otpExpiry
     });
 
@@ -134,7 +135,7 @@ const login = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.userId, {
-      attributes: ['id', 'name', 'email', 'created_at']
+      attributes: ['id', 'name', 'email', 'role', 'created_at']
     });
 
     if (!user) {
