@@ -11,13 +11,15 @@ app.use(morgan('dev'));  // Ghi log API calls
 // Routes
 const authRoutes  = require('./routes/auth.route');   // Challenge 3: Register/Login/Profile
 const otpRoutes   = require('./routes/otp.route');    // Challenge 4: Send-OTP/Verify-OTP
-const classRoutes  = require('./routes/class.route'); // Challenge 2: CRUD Classes
-const courseRoutes = require('./routes/course.route');// Challenge 2: CRUD Courses
+const classRoutes      = require('./routes/class.route');      // Challenge 2: CRUD Classes
+const courseRoutes     = require('./routes/course.route');     // Challenge 2: CRUD Courses
+const enrollmentRoutes = require('./routes/enrollment.route'); // Challenge 6: Enrollment
 
-app.use('/api/auth',    authRoutes);
-app.use('/api/auth',    otpRoutes);
-app.use('/api/classes', classRoutes);
-app.use('/api/courses', courseRoutes);
+app.use('/api/auth',        authRoutes);
+app.use('/api/auth',        otpRoutes);
+app.use('/api/classes',     classRoutes);
+app.use('/api/courses',     courseRoutes);
+app.use('/api/enrollments', enrollmentRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
