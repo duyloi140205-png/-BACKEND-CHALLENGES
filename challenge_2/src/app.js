@@ -2,22 +2,24 @@ const express = require('express');
 const morgan = require('morgan');
 require('dotenv').config();
 
-const courseRoutes = require('./routes/course.route');
-const classRoutes = require('./routes/class.route');
-
 const app = express();
 
 // Middleware xử lý trước khi vào Route
 app.use(express.json()); // Đọc dữ liệu JSON
 app.use(morgan('dev'));  // Ghi log API calls
 
-const authRoutes = require('./routes/auth.route');
-
 // Routes
-app.use('/api/courses', courseRoutes);
+const authRoutes  = require('./routes/auth.route');   // Challenge 3: Register/Login/Profile
+const otpRoutes   = require('./routes/otp.route');    // Challenge 4: Send-OTP/Verify-OTP
+const classRoutes  = require('./routes/class.route'); // Challenge 2: CRUD Classes
+const courseRoutes = require('./routes/course.route');// Challenge 2: CRUD Courses
+
+app.use('/api/auth',    authRoutes);
+app.use('/api/auth',    otpRoutes);
 app.use('/api/classes', classRoutes);
-app.use('/api/auth', authRoutes);
-// Global Error Handler (Xử lý lỗi toàn cục)
+app.use('/api/courses', courseRoutes);
+
+// Global Error Handler
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({
@@ -30,15 +32,15 @@ const PORT = process.env.PORT || 3000;
 const sequelize = require('./config/database');
 
 // Kết nối DB và chạy server
-sequelize.sync({ force: false })
+sequelize.sync()
     .then(() => {
-        console.log('Database synced!');
+        console.log('✅ Database synced!');
         app.listen(PORT, () => {
-            console.log(`Server running on port ${PORT}`);
+            console.log(`🚀 Server running on port ${PORT}`);
         });
     })
     .catch((err) => {
-        console.error('Unable to sync database:', err);
+        console.error('❌ Unable to sync database:', err);
     });
 
 module.exports = app;

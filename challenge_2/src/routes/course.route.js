@@ -1,32 +1,28 @@
 const express = require('express');
-const { param, body } = require('express-validator');
-const courseController = require('../controllers/course.controller');
-const { handleValidationResult } = require('../middlewares/validation.middleware');
 const router = express.Router();
+const { body } = require('express-validator');
+const {
+  getAllCourses,
+  getCourseById,
+  createCourse,
+  updateCourse,
+  deleteCourse
+} = require('../controllers/course.controller');
+const authMiddleware = require('../middlewares/auth.middleware');
+const roleMiddleware = require('../middlewares/role.middleware');
 
-router.get('/', courseController.getAll);
+const courseValidation = [
+  body('name').notEmpty().withMessage('Name is required'),
+  body('price').isFloat({ min: 0 }).withMessage('Price must be a positive number'),
+];
 
-router.get('/:id', [
-  param('id').isUUID().withMessage('ID phải đúng định dạng UUID'),
-  handleValidationResult
-], courseController.getById);
+// Public: ai cũng xem được
+router.get('/', getAllCourses);
+router.get('/:id', getCourseById);
 
-router.post('/', [
-  body('name').notEmpty().withMessage('Tên khóa học không được để trống'),
-  body('price').isNumeric().withMessage('Giá tiền phải là số'),
-  handleValidationResult
-], courseController.create);
-
-router.put('/:id', [
-  param('id').isUUID().withMessage('ID phải đúng định dạng UUID'),
-  body('name').notEmpty().withMessage('Tên khóa học không được để trống'),
-  body('price').isNumeric().withMessage('Giá tiền phải là số'),
-  handleValidationResult
-], courseController.update);
-
-router.delete('/:id', [
-  param('id').isUUID().withMessage('ID phải đúng định dạng UUID'),
-  handleValidationResult
-], courseController.delete);
+// Protected: admin & instructor mới được tạo/sửa/xóa
+router.post('/', authMiddleware, roleMiddleware('admin', 'instructor'), courseValidation, createCourse);
+router.put('/:id', authMiddleware, roleMiddleware('admin', 'instructor'), courseValidation, updateCourse);
+router.delete('/:id', authMiddleware, roleMiddleware('admin'), deleteCourse);
 
 module.exports = router;

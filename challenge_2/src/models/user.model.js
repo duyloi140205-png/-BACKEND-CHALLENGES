@@ -1,4 +1,4 @@
-const { DataTypes } = require('sequelize');
+  const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
 const User = sequelize.define('User', {
@@ -16,6 +16,11 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: false,
     unique: true
+  },
+  role: {
+    type: DataTypes.ENUM('admin', 'instructor', 'student'),
+    allowNull: false,
+    defaultValue: 'student'
   }
 }, {
   tableName: 'users',
@@ -42,7 +47,19 @@ const UserAuth = sequelize.define('UserAuth', {
   password_hash: {
     type: DataTypes.STRING,
     allowNull: false
-  }
+  },
+    otp_code: {
+    type: DataTypes.STRING(6),
+    allowNull: true
+  },
+    otp_expiry: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  is_verified: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
 }, {
   tableName: 'user_auths',
   timestamps: true,

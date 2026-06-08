@@ -58,10 +58,4 @@ const deleteClass = async (req, res) => {
   }
 };
 
-module.exports = { 
-  getAll: getAllClasses, 
-  getById: getClassById, 
-  create: createClass, 
-  update: updateClass, 
-  delete: deleteClass 
-};
+module.exports = { getAllClasses, getClassById, createClass, updateClass, deleteClass };

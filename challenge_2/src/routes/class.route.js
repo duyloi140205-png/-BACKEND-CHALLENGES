@@ -1,32 +1,28 @@
 const express = require('express');
-const { param, body } = require('express-validator');
-const classController = require('../controllers/class.controller');
-const { handleValidationResult } = require('../middlewares/validation.middleware');
 const router = express.Router();
+const { body } = require('express-validator');
+const {
+  getAllClasses,
+  getClassById,
+  createClass,
+  updateClass,
+  deleteClass
+} = require('../controllers/class.controller');
+const authMiddleware = require('../middlewares/auth.middleware');
+const roleMiddleware = require('../middlewares/role.middleware');
 
-router.get('/', classController.getAll);
+const classValidation = [
+  body('name').notEmpty().withMessage('Name is required'),
+  body('course_id').isInt({ min: 1 }).withMessage('course_id must be a valid number'),
+];
 
-router.get('/:id', [
-  param('id').isUUID().withMessage('ID phải đúng định dạng UUID'),
-  handleValidationResult
-], classController.getById);
+// Public: ai cũng xem được
+router.get('/', getAllClasses);
+router.get('/:id', getClassById);
 
-router.post('/', [
-  body('name').notEmpty().withMessage('Tên lớp học không được để trống'),
-  body('course_id').isUUID().withMessage('course_id phải đúng định dạng UUID'),
-  handleValidationResult
-], classController.create);
-
-router.put('/:id', [
-  param('id').isUUID().withMessage('ID phải đúng định dạng UUID'),
-  body('name').notEmpty().withMessage('Tên lớp học không được để trống'),
-  body('course_id').isUUID().withMessage('course_id phải đúng định dạng UUID'),
-  handleValidationResult
-], classController.update);
-
-router.delete('/:id', [
-  param('id').isUUID().withMessage('ID phải đúng định dạng UUID'),
-  handleValidationResult
-], classController.delete);
+// Protected: admin & instructor mới được tạo/sửa/xóa
+router.post('/', authMiddleware, roleMiddleware('admin', 'instructor'), classValidation, createClass);
+router.put('/:id', authMiddleware, roleMiddleware('admin', 'instructor'), classValidation, updateClass);
+router.delete('/:id', authMiddleware, roleMiddleware('admin'), deleteClass);
 
 module.exports = router;

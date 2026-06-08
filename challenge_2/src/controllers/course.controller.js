@@ -60,10 +60,4 @@ const deleteCourse = async (req, res) => {
   }
 };
 
-module.exports = { 
-  getAll: getAllCourses, 
-  getById: getCourseById, 
-  create: createCourse, 
-  update: updateCourse, 
-  delete: deleteCourse 
-};
+module.exports = { getAllCourses, getCourseById, createCourse, updateCourse, deleteCourse };

@@ -1,33 +1,47 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
+const Course = require('./course.model');
 
 const Class = sequelize.define('Class', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
+    type: DataTypes.INTEGER,
     primaryKey: true,
-    allowNull: false
+    autoIncrement: true,
   },
   course_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false,
     references: {
-      model: 'courses',
-      key: 'id'
-    }
+      model: Course,
+      key: 'id',
+    },
   },
   name: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: false,
+  },
+  start_date: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+  },
+  end_date: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+  },
+  max_students: {
+    type: DataTypes.INTEGER,
+    defaultValue: 30,
   },
   status: {
     type: DataTypes.ENUM('active', 'inactive'),
-    defaultValue: 'active'
-  }
+    defaultValue: 'active',
+  },
 }, {
   tableName: 'classes',
   timestamps: true,
-  underscored: true
 });
+
+Course.hasMany(Class, { foreignKey: 'course_id' });
+Class.belongsTo(Course, { foreignKey: 'course_id' });
 
 module.exports = Class;
