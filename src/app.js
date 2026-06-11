@@ -23,6 +23,24 @@ app.use('/api/enrollments', enrollmentRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
+    // Multer file size error
+    if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+            violations: [{ field: 'file', message: 'File quá lớn, tối đa 2MB' }]
+        });
+    }
+    // Multer file type error
+    if (err.message === 'Chỉ chấp nhận file CSV') {
+        return res.status(400).json({
+            violations: [{ field: 'file', message: err.message }]
+        });
+    }
+    // Multer boundary error (không có file)
+    if (err.message && err.message.includes('Boundary not found')) {
+        return res.status(400).json({
+            violations: [{ field: 'file', message: 'Vui lòng upload file CSV' }]
+        });
+    }
     console.error(err.stack);
     res.status(500).json({
         status: 'error',
