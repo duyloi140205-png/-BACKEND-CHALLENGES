@@ -15,12 +15,27 @@ const sendOtpEmail = async (toEmail, otpCode) => {
       </div>
     `,
   };
- try {
-  await sgMail.send(msg);
-} catch (error) {
-  console.error('SendGrid error:', JSON.stringify(error.response?.body));
-  throw error;
-}
+  try {
+    await sgMail.send(msg);
+  } catch (error) {
+    console.error('SendGrid error:', JSON.stringify(error.response?.body));
+    throw error;
+  }
 };
 
-module.exports = { sendOtpEmail };
+const sendReminderEmail = async (toEmail, subject, htmlContent) => {
+  const msg = {
+    to: toEmail,
+    from: process.env.SENDER_EMAIL,
+    subject,
+    html: htmlContent,
+  };
+  try {
+    await sgMail.send(msg);
+  } catch (error) {
+    console.error(`SendGrid reminder error to ${toEmail}:`, JSON.stringify(error.response?.body));
+    throw error;
+  }
+};
+
+module.exports = { sendOtpEmail, sendReminderEmail };

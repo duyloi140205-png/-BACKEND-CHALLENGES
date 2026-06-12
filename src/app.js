@@ -14,15 +14,37 @@ const otpRoutes   = require('./routes/otp.route');    // Challenge 4: Send-OTP/V
 const classRoutes      = require('./routes/class.route');      // Challenge 2: CRUD Classes
 const courseRoutes     = require('./routes/course.route');     // Challenge 2: CRUD Courses
 const enrollmentRoutes = require('./routes/enrollment.route'); // Challenge 6: Enrollment
+const roleRoutes       = require('./routes/role.route');       // Challenge 8: Role management
+const cronRoutes       = require('./routes/cron.route');       // Challenge 10: Cron job
 
 app.use('/api/auth',        authRoutes);
 app.use('/api/auth',        otpRoutes);
 app.use('/api/classes',     classRoutes);
 app.use('/api/courses',     courseRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
+app.use('/api/roles',       roleRoutes);
+app.use('/api/cron',        cronRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
+    // Multer file size error
+    if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+            violations: [{ field: 'file', message: 'File quá lớn, tối đa 2MB' }]
+        });
+    }
+    // Multer file type error
+    if (err.message === 'Chỉ chấp nhận file CSV') {
+        return res.status(400).json({
+            violations: [{ field: 'file', message: err.message }]
+        });
+    }
+    // Multer boundary error (không có file)
+    if (err.message && err.message.includes('Boundary not found')) {
+        return res.status(400).json({
+            violations: [{ field: 'file', message: 'Vui lòng upload file CSV' }]
+        });
+    }
     console.error(err.stack);
     res.status(500).json({
         status: 'error',
@@ -37,6 +59,11 @@ const sequelize = require('./config/database');
 sequelize.sync()
     .then(() => {
         console.log('✅ Database synced!');
+
+        // Khởi động cron job
+        const { startCronJob } = require('./services/scheduler.service');
+        startCronJob();
+
         app.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);
         });

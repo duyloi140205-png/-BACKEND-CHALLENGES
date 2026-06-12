@@ -8,13 +8,19 @@ const {
   updateCourse,
   deleteCourse
 } = require('../controllers/course.controller');
+const { importCourses, exportCourses } = require('../controllers/import_export.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 const roleMiddleware = require('../middlewares/role.middleware');
+const upload = require('../middlewares/upload.middleware');
 
 const courseValidation = [
   body('name').notEmpty().withMessage('Name is required'),
   body('price').isFloat({ min: 0 }).withMessage('Price must be a positive number'),
 ];
+
+// Challenge 9: Import/Export — phải đặt TRƯỚC /:id để tránh conflict
+router.post('/import', authMiddleware, roleMiddleware('admin', 'instructor'), upload.single('file'), importCourses);
+router.get('/export', authMiddleware, roleMiddleware('admin', 'instructor'), exportCourses);
 
 // Public: ai cũng xem được
 router.get('/', getAllCourses);
