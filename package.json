@@ -5,7 +5,8 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "test": "jest --testPathPattern=tests/ --forceExit"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",
@@ -23,6 +24,7 @@
     "sequelize": "^6.37.8"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
     "nodemon": "^3.1.0"
   }
 }
