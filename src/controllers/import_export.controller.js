@@ -1,7 +1,9 @@
 const Course = require('../models/course.model');
+const { User } = require('../models/user.model');
 const { parseCsvBuffer, toCsvString } = require('../services/csv.service');
 
 // POST /api/courses/import - Import courses từ CSV (admin/instructor only)
+// Mẫu CSV: title, description, instructor_email
 const importCourses = async (req, res) => {
   try {
     // Kiểm tra file tồn tại
@@ -34,38 +36,54 @@ const importCourses = async (req, res) => {
       });
     }
 
-    // Validate và import từng dòng
+    // Validate từng dòng
     const violations = [];
     const validRows = [];
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    records.forEach((row, index) => {
+    for (let index = 0; index < records.length; index++) {
+      const row = records[index];
       const rowNum = index + 2; // +2 vì dòng 1 là header
       const rowErrors = [];
 
-      // Validate name
-      if (!row.name || row.name.trim() === '') {
-        rowErrors.push(`Dòng ${rowNum}: name là bắt buộc`);
+      // Validate title (bắt buộc)
+      if (!row.title || row.title.trim() === '') {
+        rowErrors.push(`Dòng ${rowNum}: title là bắt buộc`);
       }
 
-      // Validate price
-      const price = parseFloat(row.price);
-      if (row.price === undefined || row.price === '' || isNaN(price) || price < 0) {
-        rowErrors.push(`Dòng ${rowNum}: price phải là số không âm`);
+      // Validate instructor_email (bắt buộc + format hợp lệ)
+      if (!row.instructor_email || row.instructor_email.trim() === '') {
+        rowErrors.push(`Dòng ${rowNum}: instructor_email là bắt buộc`);
+      } else if (!emailRegex.test(row.instructor_email.trim())) {
+        rowErrors.push(`Dòng ${rowNum}: instructor_email không hợp lệ`);
+      } else {
+        // Kiểm tra instructor tồn tại trong DB với role instructor hoặc admin
+        const instructor = await User.findOne({
+          where: { email: row.instructor_email.trim() },
+        });
+        if (!instructor) {
+          rowErrors.push(`Dòng ${rowNum}: instructor_email "${row.instructor_email}" không tồn tại trong hệ thống`);
+        } else if (!['instructor', 'admin'].includes(instructor.role)) {
+          rowErrors.push(`Dòng ${rowNum}: "${row.instructor_email}" không phải giảng viên`);
+        } else {
+          // Gắn instructor_id nếu hợp lệ
+          row._instructor_id = instructor.id;
+        }
       }
 
       if (rowErrors.length > 0) {
         violations.push(...rowErrors.map((message) => ({ row: rowNum, message })));
       } else {
         validRows.push({
-          name: row.name.trim(),
+          name: row.title.trim(),
           description: row.description ? row.description.trim() : null,
-          price: parseFloat(row.price),
+          price: 0,
           status: 'active',
         });
       }
-    });
+    }
 
-    // Nếu có lỗi validation, trả về violations
+    // Nếu có lỗi validation trả về violations
     if (violations.length > 0) {
       return res.status(400).json({
         status: 'error',
@@ -94,7 +112,7 @@ const importCourses = async (req, res) => {
   }
 };
 
-// GET /api/courses/export?format=csv - Export courses ra CSV (admin/instructor only)
+// GET /api/courses/export?format=csv - Export courses ra CSV streaming (admin/instructor only)
 const exportCourses = async (req, res) => {
   try {
     const { format } = req.query;
@@ -105,19 +123,27 @@ const exportCourses = async (req, res) => {
       });
     }
 
-    // Lấy tất cả courses
     const courses = await Course.findAll({
       attributes: ['id', 'name', 'description', 'price', 'status', 'createdAt'],
       order: [['createdAt', 'DESC']],
       raw: true,
     });
 
-    const columns = ['id', 'name', 'description', 'price', 'status', 'createdAt'];
-    const csvContent = toCsvString(courses, columns);
+    // Map name -> title để export đúng format mẫu CSV
+    const exportData = courses.map((c) => ({
+      id: c.id,
+      title: c.name,
+      description: c.description || '',
+      price: c.price,
+      status: c.status,
+      createdAt: c.createdAt,
+    }));
+
+    const columns = ['id', 'title', 'description', 'price', 'status', 'createdAt'];
+    const csvContent = toCsvString(exportData, columns);
 
     const filename = `courses_export_${new Date().toISOString().slice(0, 10)}.csv`;
 
-    // Streaming response
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
