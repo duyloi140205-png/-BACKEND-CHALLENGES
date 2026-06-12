@@ -14,12 +14,16 @@ const otpRoutes   = require('./routes/otp.route');    // Challenge 4: Send-OTP/V
 const classRoutes      = require('./routes/class.route');      // Challenge 2: CRUD Classes
 const courseRoutes     = require('./routes/course.route');     // Challenge 2: CRUD Courses
 const enrollmentRoutes = require('./routes/enrollment.route'); // Challenge 6: Enrollment
+const roleRoutes       = require('./routes/role.route');       // Challenge 8: Role management
+const cronRoutes       = require('./routes/cron.route');       // Challenge 10: Cron job
 
 app.use('/api/auth',        authRoutes);
 app.use('/api/auth',        otpRoutes);
 app.use('/api/classes',     classRoutes);
 app.use('/api/courses',     courseRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
+app.use('/api/roles',       roleRoutes);
+app.use('/api/cron',        cronRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
@@ -55,6 +59,11 @@ const sequelize = require('./config/database');
 sequelize.sync()
     .then(() => {
         console.log('✅ Database synced!');
+
+        // Khởi động cron job
+        const { startCronJob } = require('./services/scheduler.service');
+        startCronJob();
+
         app.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);
         });
