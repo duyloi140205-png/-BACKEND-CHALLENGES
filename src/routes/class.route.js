@@ -8,6 +8,7 @@ const {
   updateClass,
   deleteClass
 } = require('../controllers/class.controller');
+const { bulkEnroll } = require('../controllers/bulk_enroll.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 const roleMiddleware = require('../middlewares/role.middleware');
 
@@ -15,6 +16,9 @@ const classValidation = [
   body('name').notEmpty().withMessage('Name is required'),
   body('course_id').isInt({ min: 1 }).withMessage('course_id must be a valid number'),
 ];
+
+// Challenge 11: Bulk enroll - phải đặt TRƯỚC /:id để tránh conflict
+router.post('/:id/bulk-enroll', authMiddleware, roleMiddleware('admin', 'instructor'), bulkEnroll);
 
 // Public: ai cũng xem được
 router.get('/', getAllClasses);
