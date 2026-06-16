@@ -1,12 +1,61 @@
 const express = require('express');
 const morgan = require('morgan');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
 require('dotenv').config();
 
 const app = express();
 
-// Middleware xử lý trước khi vào Route
-app.use(express.json()); // Đọc dữ liệu JSON
-app.use(morgan('dev'));  // Ghi log API calls
+// Middleware
+app.use(express.json());
+app.use(morgan('dev'));
+
+// =============================================
+// Swagger UI - chỉ deploy ở development/staging
+// Không deploy ở production
+// =============================================
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customSiteTitle: 'E-Learning API Docs',
+  }));
+  console.log('📄 Swagger UI available at /api-docs');
+}
+
+// =============================================
+// Health Check - Challenge 12
+// =============================================
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Kiểm tra trạng thái server
+ *     responses:
+ *       200:
+ *         description: Server đang hoạt động bình thường
+ *       503:
+ *         description: Server hoặc DB có vấn đề
+ */
+app.get('/health', async (req, res) => {
+  try {
+    const sequelize = require('./config/database');
+    await sequelize.authenticate();
+    return res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      database: 'connected',
+      environment: process.env.NODE_ENV || 'development',
+    });
+  } catch (error) {
+    return res.status(503).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      database: 'disconnected',
+      error: error.message,
+    });
+  }
+});
 
 // Routes
 const authRoutes  = require('./routes/auth.route');   // Challenge 3: Register/Login/Profile
