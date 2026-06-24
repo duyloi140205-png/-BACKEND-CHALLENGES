@@ -2,19 +2,16 @@
 -- ECOMMERCE SYSTEM - DATABASE SCHEMA
 -- PostgreSQL
 -- =============================================
--- Bảng yêu cầu  : product, inventory, warehouse, cart, order, user, payment
--- Bảng bổ sung  : category, product_image, product_variant,
---                 user_auth, address, coupon, order_item,
---                 inventory_log, shipment, review
--- Cập nhật      : thêm cột partner vào payment, thêm payos vào method
+-- Cập nhật theo yêu cầu leader:
+--   1. Thêm jti_salt UUID vào user_auth (ngăn access token phiên login cũ)
+--   2. Bỏ bảng cart, gộp user_id/coupon_id/created_at/updated_at vào cart_item
+--   3. Đem coupon_id từ orders sang order_item (mỗi item có coupon riêng)
 -- =============================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ─────────────────────────────────────────────
 -- 1. USERS
--- Lưu thông tin tài khoản người dùng
--- Role: customer (khách hàng), admin (quản trị), staff (nhân viên)
 -- ─────────────────────────────────────────────
 CREATE TABLE users (
     id              BIGSERIAL       PRIMARY KEY,
@@ -31,10 +28,14 @@ CREATE TABLE users (
 );
 
 -- Tách password hash ra bảng riêng để bảo mật
+-- jti_salt: UUID mới mỗi lần login, dùng để vô hiệu hóa token phiên cũ
+-- Khi gen access_token: mapping jti_salt + user_id vào token
+-- Middleware check: nếu jti_salt trong token không khớp DB → chặn lại
 CREATE TABLE user_auth (
     id              BIGSERIAL       PRIMARY KEY,
     user_id         BIGINT          NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     password_hash   VARCHAR(255)    NOT NULL,
+    jti_salt        UUID            NOT NULL DEFAULT gen_random_uuid(),
     last_login_at   TIMESTAMPTZ,
     refresh_token   TEXT,
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
@@ -56,7 +57,6 @@ CREATE TABLE address (
 
 -- ─────────────────────────────────────────────
 -- 2. CATEGORY
--- Danh mục đa cấp: Điện tử → Điện thoại → iPhone
 -- ─────────────────────────────────────────────
 CREATE TABLE category (
     id              BIGSERIAL       PRIMARY KEY,
@@ -96,7 +96,6 @@ CREATE TABLE product (
     CONSTRAINT chk_sale_price CHECK (sale_price IS NULL OR sale_price <= base_price)
 );
 
--- Nhiều ảnh cho 1 sản phẩm
 CREATE TABLE product_image (
     id              BIGSERIAL       PRIMARY KEY,
     product_id      BIGINT          NOT NULL REFERENCES product(id) ON DELETE CASCADE,
@@ -106,7 +105,6 @@ CREATE TABLE product_image (
     is_primary      BOOLEAN         NOT NULL DEFAULT FALSE
 );
 
--- Biến thể sản phẩm: đỏ-M, đỏ-L, xanh-M...
 CREATE TABLE product_variant (
     id              BIGSERIAL       PRIMARY KEY,
     product_id      BIGINT          NOT NULL REFERENCES product(id) ON DELETE CASCADE,
@@ -140,9 +138,6 @@ CREATE TABLE warehouse (
 
 -- ─────────────────────────────────────────────
 -- 5. INVENTORY
--- Tồn kho theo (variant_id, warehouse_id)
--- quantity: tổng hàng | reserved: đang giữ cho đơn chờ
--- available = quantity - reserved
 -- ─────────────────────────────────────────────
 CREATE TABLE inventory (
     id              BIGSERIAL       PRIMARY KEY,
@@ -156,7 +151,6 @@ CREATE TABLE inventory (
     CONSTRAINT chk_reserved CHECK (reserved <= quantity)
 );
 
--- Lịch sử biến động tồn kho
 CREATE TABLE inventory_log (
     id              BIGSERIAL       PRIMARY KEY,
     inventory_id    BIGINT          NOT NULL REFERENCES inventory(id),
@@ -172,7 +166,6 @@ CREATE TABLE inventory_log (
 
 -- ─────────────────────────────────────────────
 -- 6. COUPON
--- Mã giảm giá: percent (%) hoặc fixed (số tiền cố định)
 -- ─────────────────────────────────────────────
 CREATE TABLE coupon (
     id              BIGSERIAL       PRIMARY KEY,
@@ -193,35 +186,28 @@ CREATE TABLE coupon (
 );
 
 -- ─────────────────────────────────────────────
--- 7. CART
--- Giỏ hàng - hỗ trợ user đăng nhập và guest (session_id)
+-- 7. CART_ITEM
+-- Bỏ bảng cart riêng, gộp thẳng vào cart_item
+-- user_id / session_id xác định giỏ của ai
+-- coupon_id áp dụng cho item này
 -- ─────────────────────────────────────────────
-CREATE TABLE cart (
+CREATE TABLE cart_item (
     id              BIGSERIAL       PRIMARY KEY,
     user_id         BIGINT          REFERENCES users(id) ON DELETE CASCADE,
     session_id      VARCHAR(128),
-    coupon_id       BIGINT          REFERENCES coupon(id) ON DELETE SET NULL,
-    expires_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW() + INTERVAL '7 days',
-    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_cart_owner CHECK (user_id IS NOT NULL OR session_id IS NOT NULL)
-);
-
--- Sản phẩm trong giỏ
-CREATE TABLE cart_item (
-    id              BIGSERIAL       PRIMARY KEY,
-    cart_id         BIGINT          NOT NULL REFERENCES cart(id) ON DELETE CASCADE,
     variant_id      BIGINT          NOT NULL REFERENCES product_variant(id),
     quantity        INT             NOT NULL DEFAULT 1 CHECK (quantity > 0),
     unit_price      NUMERIC(15,2)   NOT NULL CHECK (unit_price >= 0),
-    added_at        TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    UNIQUE (cart_id, variant_id)
+    coupon_id       BIGINT          REFERENCES coupon(id) ON DELETE SET NULL,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, variant_id),
+    CONSTRAINT chk_cart_owner CHECK (user_id IS NOT NULL OR session_id IS NOT NULL)
 );
 
 -- ─────────────────────────────────────────────
 -- 8. ORDERS
--- Snapshot địa chỉ giao hàng lưu dạng TEXT khi đặt
--- (tránh sai lệch khi user đổi địa chỉ sau)
+-- coupon_id đã chuyển sang order_item
 -- ─────────────────────────────────────────────
 CREATE TABLE orders (
     id                  BIGSERIAL       PRIMARY KEY,
@@ -231,8 +217,6 @@ CREATE TABLE orders (
     shipping_name       VARCHAR(150)    NOT NULL,
     shipping_phone      VARCHAR(20)     NOT NULL,
     shipping_address    TEXT            NOT NULL,
-    coupon_id           BIGINT          REFERENCES coupon(id) ON DELETE SET NULL,
-    coupon_code         VARCHAR(50),
     subtotal            NUMERIC(15,2)   NOT NULL CHECK (subtotal >= 0),
     discount_amount     NUMERIC(15,2)   NOT NULL DEFAULT 0 CHECK (discount_amount >= 0),
     shipping_fee        NUMERIC(15,2)   NOT NULL DEFAULT 0 CHECK (shipping_fee >= 0),
@@ -249,11 +233,13 @@ CREATE TABLE orders (
     CONSTRAINT chk_total CHECK (total_amount = subtotal - discount_amount + shipping_fee)
 );
 
--- Dòng sản phẩm trong đơn - snapshot tại thời điểm đặt
+-- coupon_id ở đây để mỗi item có thể áp dụng coupon riêng
+-- không dùng chung ở orders tránh ảnh hưởng các items khác
 CREATE TABLE order_item (
     id              BIGSERIAL       PRIMARY KEY,
     order_id        BIGINT          NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     variant_id      BIGINT          REFERENCES product_variant(id) ON DELETE SET NULL,
+    coupon_id       BIGINT          REFERENCES coupon(id) ON DELETE SET NULL,
     product_name    VARCHAR(300)    NOT NULL,
     variant_sku     VARCHAR(100)    NOT NULL,
     variant_attrs   JSONB           NOT NULL DEFAULT '{}',
@@ -285,12 +271,7 @@ CREATE TABLE shipment (
 
 -- ─────────────────────────────────────────────
 -- 10. PAYMENT
--- Cập nhật theo yêu cầu leader:
---   + Thêm payos vào danh sách method
---   + Thêm cột partner: tên đối tác/cổng thanh toán xử lý giao dịch
---     Ví dụ: method='momo' → partner='MoMo Corporation'
---            method='vnpay' → partner='VNPAY'
---            method='payos' → partner='PayOS'
+-- partner: tên đối tác cổng thanh toán (thêm theo yêu cầu leader)
 -- ─────────────────────────────────────────────
 CREATE TABLE payment (
     id                  BIGSERIAL       PRIMARY KEY,
@@ -334,6 +315,7 @@ CREATE TABLE review (
 -- ─────────────────────────────────────────────
 CREATE INDEX idx_users_email            ON users(email);
 CREATE INDEX idx_users_role             ON users(role);
+CREATE INDEX idx_user_auth_jti          ON user_auth(jti_salt);
 CREATE INDEX idx_address_user           ON address(user_id);
 CREATE INDEX idx_category_parent        ON category(parent_id);
 CREATE INDEX idx_category_slug          ON category(slug);
@@ -345,13 +327,13 @@ CREATE INDEX idx_variant_product        ON product_variant(product_id);
 CREATE INDEX idx_variant_attrs          ON product_variant USING GIN(attributes);
 CREATE INDEX idx_inventory_variant      ON inventory(variant_id);
 CREATE INDEX idx_inventory_warehouse    ON inventory(warehouse_id);
-CREATE INDEX idx_cart_user              ON cart(user_id) WHERE user_id IS NOT NULL;
-CREATE INDEX idx_cart_session           ON cart(session_id) WHERE session_id IS NOT NULL;
-CREATE INDEX idx_cart_item_cart         ON cart_item(cart_id);
+CREATE INDEX idx_cart_item_user         ON cart_item(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX idx_cart_item_session      ON cart_item(session_id) WHERE session_id IS NOT NULL;
 CREATE INDEX idx_orders_user            ON orders(user_id);
 CREATE INDEX idx_orders_status          ON orders(status);
 CREATE INDEX idx_orders_created         ON orders(created_at DESC);
 CREATE INDEX idx_order_item_order       ON order_item(order_id);
+CREATE INDEX idx_order_item_coupon      ON order_item(coupon_id);
 CREATE INDEX idx_payment_order          ON payment(order_id);
 CREATE INDEX idx_payment_status         ON payment(status);
 CREATE INDEX idx_payment_partner        ON payment(partner);
