@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # Service 1: PostgreSQL database
+  db:
+    image: postgres:15-alpine
+    container_name: elearning_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      # Lưu data DB ra ngoài container, tắt container không mất data
+      - postgres_data:/var/lib/postgresql/data
+      # Tự động chạy init.sql khi DB khởi động lần đầu
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Service 2: Node.js app
+  app:
+    build: .
+    container_name: elearning_app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      DB_HOST: db          # Tên service db bên trên, không dùng localhost
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      SENDER_EMAIL: ${SENDER_EMAIL}
+      PORT: 3000
+    depends_on:
+      db:
+        condition: service_healthy  # Chờ DB healthy rồi mới start app
+    volumes:
+      # Mount .env file vào container (không copy vào image)
+      - ./.env:/app/.env
+
+volumes:
+  postgres_data:  # Named volume - Docker tự quản lý

@@ -1,13 +1,67 @@
 const Course = require('../models/course.model');
 const { validationResult } = require('express-validator');
+const { Op } = require('sequelize');
 
-// GET all courses
+// GET /api/courses?search=...&status=...&page=...&limit=...
 const getAllCourses = async (req, res) => {
   try {
-    const courses = await Course.findAll();
-    res.json({ status: 'success', data: courses });
+    const { search, status, page, limit } = req.query;
+
+    // Validate query params
+    const violations = [];
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 10;
+
+    if (page && (isNaN(parseInt(page)) || parseInt(page) < 1)) {
+      violations.push({ field: 'page', message: 'page phải là số nguyên lớn hơn 0' });
+    }
+    if (limit && (isNaN(parseInt(limit)) || parseInt(limit) < 1 || parseInt(limit) > 100)) {
+      violations.push({ field: 'limit', message: 'limit phải là số nguyên từ 1 đến 100' });
+    }
+    if (status && !['active', 'inactive'].includes(status)) {
+      violations.push({ field: 'status', message: 'status phải là active hoặc inactive' });
+    }
+    if (violations.length > 0) {
+      return res.status(400).json({ status: 'error', violations });
+    }
+
+    // Build where clause
+    const where = {};
+    if (search) {
+      where.name = { [Op.iLike]: `%${search}%` }; // LIKE query (case-insensitive)
+    }
+    if (status) {
+      where.status = status;
+    }
+
+    const offset = (pageNum - 1) * limitNum;
+
+    // Query với pagination
+    const { count, rows } = await Course.findAndCountAll({
+      where,
+      limit: limitNum,
+      offset,
+      order: [['createdAt', 'DESC']],
+    });
+
+    const totalPages = Math.ceil(count / limitNum);
+
+    console.log(`[INFO] List courses - search="${search || ''}" status="${status || ''}" page=${pageNum} limit=${limitNum} total=${count} at ${new Date().toISOString()}`);
+
+    return res.status(200).json({
+      status: 'success',
+      data: rows,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: count,
+        totalPages,
+      },
+    });
+
   } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
+    console.error(`[ERROR] Get courses failed: ${error.message}`);
+    res.status(500).json({ status: 'error', message: 'Lỗi server, vui lòng thử lại' });
   }
 };
 
